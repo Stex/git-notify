@@ -1,39 +1,70 @@
 #!/bin/bash
 
-# how we want to extract the variables from the commit message.
-format_name="--format=%cn"
-format_when="--format=%cr"
-format_summary="--format=%s"
-format_body="--format=%b"
+#----------Your Repository Settings----------
+repository="git://github.com/Stex/git-notify.git"
+branch="master"
+#---------- Do not edit below here ----------
 
-# what repository do we want to watch.
-repository="origin/master"
-latest_revision="none"
 
-# loop forever, need to kill the process.
-while [ 1 ]; do
 
-    # get the latest revision SHA.
-    current_revision=`git rev-parse $repository`
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+notify_script="$0"
+pid_file="./git-notify.pid"
 
-    # if we haven't seen that one yet, then we know there's new stuff.
-    if [ $latest_revision != $current_revision ]; then
+command=${1:-start}
 
-        # mark the newest revision as seen.
-        latest_revision=$current_revision
+case "$command" in
+    start)
+        $notify_script run &
+        echo $! > $pid_file
+        echo "Commit watcher started at $!"
+        ;;
+    stop)
+        echo "Stopping commit watcher"
+        kill -9 $(<"$pid_file")
+	$(rm "$pid_file")
+        ;;
+    *)
+        #Simply run the watcher
+        # how we want to extract the variables from the commit message.
+        format_name="--format=%cn"
+        format_when="--format=%cr"
+        format_summary="--format=%s"
+        format_body="--format=%b"
 
-        # extract the details from the log.
-        commit_name=`git log -1 $format_name $latest_revision`
-        commit_when=`git log -1 $format_when $latest_revision`
-        commit_summary=`git log -1 $format_summary $latest_revision`
-        commit_body=`git log -1 $format_body $latest_revision`
+        latest_revision="none"
 
-        # notify the user of the commit.
-        summary="$commit_name committed to $repository $commit_when!"
-        body="$commit_summary\n\n$commit_body"
-        `notify-send "$summary" "$body"`
+        # loop forever, need to kill the process.
+        while [ 1 ]; do
 
-    fi
-    sleep 60
-done
+            # get the latest revision SHA.
+            current_revision=$(git ls-remote --heads $repository $branch | tail -n 1)
+
+            # if we haven't seen that one yet, then we know there's new stuff.
+            if [ "$latest_revision" != "$current_revision" ]; then
+
+                # mark the newest revision as seen.
+                latest_revision=$current_revision
+
+                # extract the details from the log.
+                commit_name=`git log -1 $format_name $latest_revision`
+                commit_when=`git log -1 $format_when $latest_revision`
+                commit_summary=`git log -1 $format_summary $latest_revision`
+                commit_body=`git log -1 $format_body $latest_revision`
+
+                # notify the user of the commit.
+                summary="$commit_name committed to $branch $commit_when!"
+                body="$commit_summary\n\n$commit_body"
+                `notify-send "$summary" "$body"`
+
+            fi
+            sleep 60
+        done
+
+        ;;
+esac
+exit 0
+
+
+
 
