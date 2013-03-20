@@ -7,22 +7,43 @@ branch="master"
 
 
 
+#------------------Variables-----------------
+#Our current working directory
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+#The notifier script, just a better name for $0
 notify_script="$0"
+
+#The file the process PID is written to
 pid_file="./git-notify.pid"
 
+#The first command line argument for our script.
+#Defaults to 'start'
 command=${1:-start}
+#--------------------------------------------
 
 case "$command" in
     start)
-        $notify_script run &
-        echo $! > $pid_file
-        echo "Commit watcher started at $!"
+	#Check if the script is already running (resp. if a PID-file exists)
+	#If yes, we don't want to start it again.
+	#TODO: check if the process is actually running using e.g. ps
+        if [ -f "$pid_file" ]
+        then
+            echo "Commit watcher is already running."
+        else
+            $notify_script run &
+            echo $! > "$pid_file"
+            echo "Commit watcher started at $!"
+        fi
         ;;
     stop)
-        echo "Stopping commit watcher"
-        kill -9 $(<"$pid_file")
-	$(rm "$pid_file")
+	#Check if there is a PID-file. If no, we cannot close the watcher.
+        if [ -f "$pid_file" ]
+	then
+		echo "Stopping commit watcher"
+        	kill -9 $(<"$pid_file")
+		$(rm "$pid_file")
+	fi
         ;;
     *)
         #Simply run the watcher
